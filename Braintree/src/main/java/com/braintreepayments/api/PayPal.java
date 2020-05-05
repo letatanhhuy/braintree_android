@@ -42,6 +42,7 @@ import com.paypal.android.sdk.onetouch.core.enums.RequestTarget;
 import com.paypal.android.sdk.onetouch.core.network.EnvironmentManager;
 import com.paypal.android.sdk.onetouch.core.sdk.PendingRequest;
 import com.paypal.android.sdk.onetouch.core.PayPalLineItem;
+import com.paypal.lighthouse.fpti.impl.TrackerFactory;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -130,6 +131,7 @@ public class PayPal {
      */
     public static void requestOneTimePayment(BraintreeFragment fragment, PayPalRequest request,
             PayPalApprovalHandler handler) {
+        TrackerFactory.getFPTITracker(fragment.getApplicationContext()).trackImpression("requestOneTimePayment");
         if (request.getAmount() != null) {
             fragment.sendAnalyticsEvent("paypal.single-payment.selected");
             if (request.shouldOfferCredit()) {
