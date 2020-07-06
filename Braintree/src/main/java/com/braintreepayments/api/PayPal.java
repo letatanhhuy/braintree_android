@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Parcel;
+
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AppCompatActivity;
@@ -14,7 +16,6 @@ import android.util.Base64;
 
 import com.braintreepayments.api.exceptions.BraintreeException;
 import com.braintreepayments.api.exceptions.BrowserSwitchException;
-import com.braintreepayments.api.exceptions.ErrorWithResponse;
 import com.braintreepayments.api.interfaces.ConfigurationListener;
 import com.braintreepayments.api.interfaces.HttpResponseCallback;
 import com.braintreepayments.api.interfaces.PayPalApprovalCallback;
@@ -42,10 +43,18 @@ import com.paypal.android.sdk.onetouch.core.enums.RequestTarget;
 import com.paypal.android.sdk.onetouch.core.network.EnvironmentManager;
 import com.paypal.android.sdk.onetouch.core.sdk.PendingRequest;
 import com.paypal.android.sdk.onetouch.core.PayPalLineItem;
+import com.paypal.lighthouse.fpti.api.FPTITracker;
+import com.paypal.lighthouse.fpti.impl.TrackerFactory;
+import com.paypal.lighthouse.fpti.model.EventParamTags;
+import com.paypal.lighthouse.fpti.utility.FPTIEndPoint;
+import com.paypal.lighthouse.fpti.utility.TrackerConfig;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Used to create and tokenize PayPal accounts. For more information see the
@@ -121,6 +130,31 @@ public class PayPal {
         requestOneTimePayment(fragment, request, null);
     }
 
+    private static FPTITracker initFPTITracker(@NonNull final Context context) {
+        //default params
+        Map<String, Object> defaultParamsMap = new HashMap<>(3);
+        defaultParamsMap.put(EventParamTags.PAGE_GROUP, "Braintree::Paypal");
+        defaultParamsMap.put(EventParamTags.COMPONENT, "BraintreeAndroidApp");
+
+        TrackerConfig.ConfigBuilder configBuilder;
+
+        if (BuildConfig.DEBUG) {
+            configBuilder = new TrackerConfig
+                    .ConfigBuilder()
+                    .disableLifecycleTracking()
+                    .withEndPoint(new FPTIEndPoint(FPTIEndPoint.Type.SANDBOX))
+                    .withDefaultEventParams(defaultParamsMap);
+        } else {
+            configBuilder = new TrackerConfig
+                    .ConfigBuilder()
+                    .disableLifecycleTracking()
+                    .withEndPoint(new FPTIEndPoint(FPTIEndPoint.Type.LIVE))
+                    .withDefaultEventParams(defaultParamsMap);
+        }
+
+        return TrackerFactory.getFPTITracker(context, configBuilder.build());
+    }
+
     /**
      * Starts the Single Payment flow for PayPal with custom PayPal approval handler.
      *
@@ -130,16 +164,21 @@ public class PayPal {
      */
     public static void requestOneTimePayment(BraintreeFragment fragment, PayPalRequest request,
             PayPalApprovalHandler handler) {
+
+        FPTITracker fptiTracker = initFPTITracker(fragment.getApplicationContext());
+
+        fptiTracker.trackImpression("requestOneTimePayment");
+        fptiTracker.startMark("requestOneTimePayment_measure");
         if (request.getAmount() != null) {
             fragment.sendAnalyticsEvent("paypal.single-payment.selected");
             if (request.shouldOfferCredit()) {
                 fragment.sendAnalyticsEvent("paypal.single-payment.credit.offered");
             }
-
             requestOneTimePayment(fragment, request, false, handler);
         } else {
             fragment.postCallback(new BraintreeException("An amount must be specified for the Single Payment flow."));
         }
+        fptiTracker.finishMark("requestOneTimePayment_measure");
     }
 
     private static void requestOneTimePayment(final BraintreeFragment fragment, final PayPalRequest paypalRequest,
