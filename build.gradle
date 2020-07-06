@@ -31,7 +31,6 @@ allprojects {
         maven {
             url 'file:///tmp/maven/'
         }
-        maven { url 'http://paypalcentral.es.paypalcorp.com/nexus/content/repositories/releases' }
     }
 
     apply plugin: 'maven'
